@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>微观靛蓝</title>
+<style>
+@font-face{font-family:'FangSong';src:url('https://zzyashley.github.io/micro-indigo/assets/fonts/simfang.ttf') format('truetype');font-weight:normal;font-style:normal;font-display:block}
+@font-face{font-family:'STXingkai';src:url('https://zzyashley.github.io/micro-indigo/assets/fonts/STXINGKA.TTF') format('truetype');font-weight:normal;font-style:normal;font-display:block}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;background:#08080c;overflow:hidden;cursor:none}
+#canvas{display:block}
+#cam-error{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:#ff6666;font:21px/1.8 'Microsoft YaHei',sans-serif;text-align:center;z-index:200;display:none;background:rgba(0,0,0,.7);padding:20px 30px;border-radius:8px}
+#debug-info{position:fixed;top:12px;left:14px;color:rgba(120,200,255,.85);font:15px 'Courier New',monospace;line-height:1.6;pointer-events:none;z-index:100;display:none}
+#counter{position:fixed;bottom:24px;right:28px;color:rgba(160,170,200,.35);font:14px 'Courier New',monospace;letter-spacing:4px;pointer-events:none;z-index:99}
+#hint{position:fixed;bottom:24px;left:28px;color:rgba(160,170,200,.3);font:14px 'Courier New',monospace;letter-spacing:3px;pointer-events:none;z-index:99;transition:opacity .8s}
+#cam-status{position:fixed;top:16px;right:20px;display:flex;align-items:center;gap:7px;pointer-events:none;z-index:101;opacity:0;transition:opacity .6s}
+#cam-dot{width:7px;height:7px;border-radius:50%;background:#4f5}
+#cam-label{color:rgba(160,200,180,.5);font:13px 'Courier New',monospace;letter-spacing:1.5px}
+#cam{position:fixed;inset:0;object-fit:cover;opacity:0;pointer-events:none;z-index:-1}
+#fs-btn{position:fixed;top:16px;left:36px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:6px;cursor:pointer;z-index:300;transition:background .3s,opacity .8s;opacity:.4}
+#fs-btn:hover{background:rgba(255,255,255,.14);opacity:1}
+#fs-btn svg{width:15px;height:15px;stroke:rgba(200,215,240,.7);stroke-width:1.4;fill:none}
+#fs-btn.exit{opacity:0;pointer-events:none}
+
+/* ── 左侧导览标签 ── */
+#guide-labels{position:fixed;top:50%;left:50px;transform:translateY(-50%);pointer-events:none;z-index:200;display:flex;flex-direction:column;gap:40px}
+.guide-tag{display:flex;align-items:center;gap:17px}
+.guide-tag svg{flex-shrink:0;opacity:.65}
+.guide-tag-text{display:flex;flex-direction:column;gap:3px}
+.guide-tag-main{font:18px "FangSong","STFangsong","KaiTi",serif;color:rgba(200,210,235,.78);letter-spacing:6px}
+.guide-tag-sub{font:14px 'Courier New',monospace;color:rgba(175,195,225,.7);letter-spacing:3px}
+/* ── 右侧握拳提示 ── */
+#guide-hold{position:fixed;top:50%;right:50px;transform:translateY(-50%);pointer-events:none;z-index:200;display:flex;flex-direction:column;align-items:center;gap:11px}
+#guide-hold svg{opacity:.6}
+#guide-hold .guide-tag-main{font:18px "FangSong","STFangsong","KaiTi",serif;color:rgba(200,210,235,.75);letter-spacing:6px;writing-mode:vertical-rl}
+#guide-hold .guide-tag-sub{font:14px 'Courier New',monospace;color:rgba(175,195,225,.65);letter-spacing:3px;writing-mode:vertical-rl}
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<video id="cam" playsinline></video>
+<div id="cam-status"><div id="cam-dot"></div><span id="cam-label">体感</span></div>
+<div id="debug-info"></div>
+<div id="cam-error"><div style="font-size:28px;margin-bottom:8px">⚠️ 摄像头不可用</div><div>请允许浏览器使用摄像头</div><div style="font-size:17px;color:#888;margin-top:4px">如已允许仍无效，检查浏览器隐私设置</div></div>
+<div id="counter">01 / 04</div>
+<div id="hint">鼠标移动拼合 · 点击或 &#8592;&#8594; 切换画面</div>
+
+<!-- 左侧导览：靠近 + 伸手 -->
+<div id="guide-labels">
+  <div class="guide-tag">
+    <svg viewBox="0 0 20 20" width="25" height="25"><circle cx="10" cy="10" r="8" fill="none" stroke="rgba(160,190,225)" stroke-width=".8"/><circle cx="10" cy="10" r="4" fill="none" stroke="rgba(160,190,225)" stroke-width=".7"/></svg>
+    <div class="guide-tag-text">
+      <div class="guide-tag-main">靠近</div>
+      <div class="guide-tag-sub">碎片散开</div>
+    </div>
+  </div>
+  <div class="guide-tag">
+    <svg viewBox="0 0 20 20" width="25" height="25"><path d="M5 18V9a1.5 1.5 0 0 1 1.5-1.5h.5a.5.5 0 0 1 .5.5v5.5h1V5a.5.5 0 0 1 1 0v8h1V7a.5.5 0 0 1 1 0v6c0 2.5-1.5 4-4 4H6a3 3 0 0 1-3-3v-3" fill="none" stroke="rgba(160,190,225)" stroke-width=".8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div class="guide-tag-text">
+      <div class="guide-tag-main">伸手</div>
+      <div class="guide-tag-sub">局部拼合</div>
+    </div>
+  </div>
+</div>
+<!-- 右侧：握拳 -->
+<div id="guide-hold">
+  <svg viewBox="0 0 20 20" width="22" height="22"><circle cx="10" cy="10" r="4.5" fill="none" stroke="rgba(160,190,225)" stroke-width=".9"/><circle cx="10" cy="10" r="1.8" fill="rgba(160,190,225,.35)"/></svg>
+  <div class="guide-tag-main">握拳</div>
+  <div class="guide-tag-sub">切换画面</div>
+</div>
+
+<button id="fs-btn" title="全屏"><svg viewBox="0 0 24 24"><g class="fs-arrow"><polyline points="8 3 3 3 3 8"/><polyline points="16 21 21 21 21 16"/></g><polyline points="3 16 3 21 8 21"/><polyline points="21 8 21 3 16 3"/></svg></button>
+
+<script src="imgs_b64.js"></script>
+<!-- MediaPipe 本地文件，不依赖 CDN，展览环境离线可用 -->
+<script src="./assets/mediapipe/hands.js"></script>
+<script src="./assets/mediapipe/camera_utils.js"></script>
+
+<script>
+"use strict";
+
+const canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
+const debugEl=document.getElementById('debug-info');
+const counterEl=document.getElementById('counter');
+const hintEl=document.getElementById('hint');
+
+let W,H,imgIndex=0,imgs=[],loaded=0,animId=null;
+let mouseX=-9999,mouseY=-9999,mouseOnCanvas=false;
+let SHOW_DEBUG=false;
+
+// ══════════════════════════════════════
+//  摄像头 & 手部追踪状态
+// ══════════════════════════════════════
+let cameraActive=false, cameraReady=false;
+let handX=-9999, handY=-9999, handDetected=false;
+let personNear=false, isFist=false;
+let handSize=0;
+let fistJustDetected=false;
+let fistCooldown=0;
+const FIST_COOLDOWN_FRAMES=90;
+let transitionAlpha=1, transitionTarget=1, transitionStart=0;
+const TRANSITION_MS=500;
+const NEAR_THRESHOLD=0.04;
+let cameraLoadAttempted=false;
+// ── 像素运动检测（保底方案）──
+let motionDetected=false;
+let lastMotionTime=0;
+let motionConsecutive=0;   // 连续检测到运动的次数（需≥2次才触发）
+const MOTION_CONSEC_THRESHOLD=2;
+const MOTION_CHECK_MS=180;
+const MOTION_FRAC=0.02;   // 2%像素变化才算运动（噪点远低于此）
+const MOTION_DIFF=30;     // 单像素RGB差值阈值（噪点通常5~15，真人体感>30）
+const MOTION_CLEAR_DELAY=4000;
+let motionOffCanvas=null, motionOffCtx=null;
+let lastMotionFrame=null;
+let motionCheckTimer=0;
+
+
+// ══════════════════════════════════════
+//  可调参数
+// ══════════════════════════════════════
+const MOUSE_RADIUS = 260;   // 鼠标影响半径（画布px）
+const MIN_CELL = 24;        // 最小正方形边长（源图像素）
+const OVERLAP = 4;          // 碎片之间重叠像素（消除接缝）
+// 每毫秒收敛/散开的比例（帧率无关）
+const CONV_RATE = 0.018;    // 归位：每ms缩短偏移量的比例
+const SCAT_RATE = 0.0012;   // 散开：每ms缩短距目标的比例
+const SNAP = 2.0;           // 吸附阈值（画布px）
+
+// ══════════════════════════════════════
+//  粒子系统
+// ══════════════════════════════════════
+const particles=[];
+const MAX_PARTICLES=22;
+
+// ── 背景升腾粒子（0/1数字 + "微观靛蓝"文字） ──
+const bgParticles=[];
+const BG_MAX=15;
+const BG_SPAWN_RATE=0.38;
+const BG_NUM_CHARS=['0','1'];
+const BG_TEXT_STR='微观靛蓝';
+let bgSpawnTimer=0;
+
+function spawnParticles(bx,by){
+  if(particles.length>=MAX_PARTICLES) return;
+  const count=Math.random()<0.4?1:2;
+  for(let i=0;i<count;i++){
+    const angle=Math.random()*Math.PI*2;
+    const speed=0.2+Math.random()*0.6;
+    const r=170+Math.random()*55;
+    const g=160+Math.random()*45;
+    const b=175+Math.random()*50;
+    particles.push({
+      x:bx+Math.random()*14-7,
+      y:by+Math.random()*14-7,
+      vx:Math.cos(angle)*speed*0.3,
+      vy:Math.sin(angle)*speed*0.3-0.55,
+      life:1, decay:0.014+Math.random()*0.02,
+      r,g,b, size:1.0+Math.random()*1.6
+    });
+  }
+}
+
+function updateParticles(){
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.x+=p.vx; p.y+=p.vy;
+    p.vy-=0.006;
+    p.life-=p.decay;
+    if(p.life<=0) particles.splice(i,1);
+  }
+}
+
+function renderParticles(){
+  for(const p of particles){
+    const a=p.life*0.5;
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,p.size*2.0,0,Math.PI*2);
+    ctx.fillStyle=`rgba(${p.r},${p.g},${p.b},${a*0.14})`;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,p.size*0.5,0,Math.PI*2);
+    ctx.fillStyle=`rgba(${p.r},${p.g},${p.b},${a*0.62})`;
+    ctx.fill();
+  }
+}
+
+// ══════════════════════════════════════
+//  背景升腾粒子 — 0/1数字 + "微观靛蓝"文字
+//  从底部缓慢上升，渐隐消散
+// ══════════════════════════════════════
+function spawnBgParticle(){
+  if(bgParticles.length>=BG_MAX) return;
+  const isText=Math.random()<0.25;
+  const ch=isText?BG_TEXT_STR:BG_NUM_CHARS[Math.floor(Math.random()*BG_NUM_CHARS.length)];
+  bgParticles.push({
+    x:Math.random()*W,
+    y:H*(0.85+Math.random()*0.2),
+    char:ch, isText,
+    vx:(Math.random()-0.5)*(0.2+Math.random()*0.5),
+    vy:-(0.15+Math.random()*0.7),
+    life:1,
+    decay:0.0008+Math.random()*0.0025,
+    size:isText?(Math.random()<0.25?59+Math.random()*42:31+Math.random()*28):(11+Math.random()*16),
+    wobble:Math.random()*Math.PI*2
+  });
+}
+
+function updateBgParticles(ms){
+  for(let i=bgParticles.length-1;i>=0;i--){
+    const p=bgParticles[i];
+    p.y+=p.vy*(ms/16);
+    p.x+=p.vx*(ms/16)+Math.sin(p.wobble+p.y*0.003)*0.15;
+    p.life-=p.decay*(ms/16);
+    if(p.life<=0||p.y<-40) bgParticles.splice(i,1);
+  }
+}
+
+function renderBgParticles(){
+  ctx.textBaseline='middle';
+  ctx.textAlign='center';
+  for(const p of bgParticles){
+    // life衰减 + 高度衰减：底部清晰，越往上越淡
+    const lifeA=p.life*0.7;
+    if(lifeA<0.008) continue;
+    // 画面上方40%开始加速消散（松口，让粒子有更多时间展示）
+    const hFade=Math.min(1, Math.max(0.06, p.y/(H*0.6)));
+    const a=lifeA*hFade;
+    if(a<0.008) continue;
+
+    ctx.save();
+
+    if(p.isText){
+      // "微观靛蓝" 四字竖排粒子：靛蓝色
+      const chars=[...p.char];
+      ctx.font=`${p.size}px "STXingkai","KaiTi","STKaiti",serif`;
+      const spacing=p.size*1.08;
+      const totalH=chars.length*spacing;
+      const startY=p.y-totalH/2+spacing/2;
+
+      // 主体 + 微光偏移层
+      for(let ci=0;ci<chars.length;ci++){
+        const cy=startY+ci*spacing;
+        ctx.fillStyle=`rgba(140,200,240,${(a*0.55).toFixed(3)})`;
+        ctx.fillText(chars[ci],p.x,cy);
+        ctx.fillStyle=`rgba(175,225,252,${(a*0.20).toFixed(3)})`;
+        ctx.fillText(chars[ci],p.x+0.5,cy-0.5);
+      }
+
+      // additive 发光层
+      ctx.globalCompositeOperation='lighter';
+      for(let ci=0;ci<chars.length;ci++){
+        const cy=startY+ci*spacing;
+        ctx.fillStyle=`rgba(150,210,245,${(a*0.10).toFixed(3)})`;
+        ctx.fillText(chars[ci],p.x,cy);
+      }
+    }else{
+      // 数字粒子：青蓝色
+      ctx.font=`${p.size}px "FangSong","STFangsong","KaiTi",serif`;
+      // 主体
+      ctx.fillStyle=`rgba(155,220,245,${(a*0.50).toFixed(3)})`;
+      ctx.fillText(p.char,p.x,p.y);
+      // 微光偏移层
+      ctx.fillStyle=`rgba(185,235,255,${(a*0.20).toFixed(3)})`;
+      ctx.fillText(p.char,p.x+0.5,p.y-1);
+      // additive 发光层
+      ctx.globalCompositeOperation='lighter';
+      ctx.fillStyle=`rgba(165,225,248,${(a*0.10).toFixed(3)})`;
+      ctx.fillText(p.char,p.x,p.y);
+    }
+
+    ctx.restore();
+  }
+}
+
+// ══════════════════════════════════════
+//  摄像头 & MediaPipe 手部追踪
+// ══════════════════════════════════════
+let cameraRetries=0;
+const CAMERA_MAX_RETRIES=3;
+const CAMERA_RETRY_DELAY=3000;
+
+async function initCamera(){
+  if(cameraLoadAttempted && cameraRetries>=CAMERA_MAX_RETRIES) return;
+  cameraLoadAttempted=true;
+  try{
+    // 检查 MediaPipe 本地库是否加载成功
+    if(typeof Hands==='undefined'||typeof Camera==='undefined'){
+      console.error('[体感] MediaPipe 本地库未加载！Hands='+typeof Hands+', Camera='+typeof Camera);
+      throw new Error('MediaPipe 库未加载');
+    }
+
+    const video=document.getElementById('cam');
+    // 摄像头超时保护：12 秒没搞定就降级为鼠标模式
+    const camTimeout=setTimeout(()=>{
+      console.warn('[体感] 摄像头初始化超时，降级为鼠标模式');
+      cameraActive=false; cameraReady=false;
+      document.getElementById('cam-error').style.display='block';
+    },12000);
+
+    const stream=await navigator.mediaDevices.getUserMedia({video:{width:960,height:720,facingMode:'user'}});
+    video.srcObject=stream;
+    await video.play();
+    clearTimeout(camTimeout);
+
+    const hands=new Hands({
+      locateFile:(f)=>`./assets/mediapipe/models/${f}`
+    });
+    hands.setOptions({
+      maxNumHands:1,
+      modelComplexity:1,
+      minDetectionConfidence:0.3,
+      minTrackingConfidence:0.4
+    });
+
+    hands.onResults(onHandResults);
+
+    const camUtil=new Camera(video,{
+      onFrame:async()=>{try{await hands.send({image:video});}catch(e){console.warn('[体感] hands.send error:',e);}},
+      width:960,height:720
+    });
+    await camUtil.start();
+    cameraActive=true; cameraReady=true;
+    document.getElementById('cam-status').style.opacity='1';
+    console.log('[体感] 摄像头+MediaPipe 本地启动成功');
+  }catch(e){
+    cameraRetries++;
+    console.warn('Camera attempt '+cameraRetries+' failed:',e.message);
+    if(cameraRetries<CAMERA_MAX_RETRIES){
+      cameraLoadAttempted=false;
+      console.log('Retrying in '+CAMERA_RETRY_DELAY/1000+'s...');
+      setTimeout(initCamera,CAMERA_RETRY_DELAY);
+    }else{
+      console.warn('Camera unavailable after '+CAMERA_MAX_RETRIES+' retries, using mouse mode');
+      cameraActive=false; cameraReady=false;
+      document.getElementById('cam-error').style.display='block';
+    }
+  }
+}
+
+function onHandResults(results){
+  if(!results.multiHandLandmarks||results.multiHandLandmarks.length===0){
+    handDetected=false; personNear=false; isFist=false;
+    return;
+  }
+  const lm=results.multiHandLandmarks[0];
+  // 手掌包围盒
+  let minX=1,maxX=0,minY=1,maxY=0;
+  for(const p of lm){if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y;}
+  handSize=Math.sqrt((maxX-minX)**2+(maxY-minY)**2);
+  personNear=handSize>NEAR_THRESHOLD;
+  handDetected=true;
+
+  // 手腕映射到画布坐标（镜像 x）
+  handX=(1-lm[0].x)*W;
+  handY=lm[0].y*H;
+
+  // 握拳检测：指尖到手腕的距离是否明显小于 PIP 到手腕的距离（不依赖手相对于摄像头的方向）
+  const tips=[8,12,16,20], pips=[6,10,14,18];
+  let curled=0;
+  for(let i=0;i<4;i++){
+    const tip=lm[tips[i]], pip=lm[pips[i]], wrist=lm[0];
+    const tipDist=Math.sqrt((tip.x-wrist.x)**2+(tip.y-wrist.y)**2);
+    const pipDist=Math.sqrt((pip.x-wrist.x)**2+(pip.y-wrist.y)**2);
+    if(tipDist < pipDist * 1.15) curled++;
+  }
+  // 大拇指：拇指尖到食指根部的距离判断
+  const thumbTip=lm[4], indexMCP=lm[5];
+  const thumbTucked=Math.sqrt((thumbTip.x-indexMCP.x)**2+(thumbTip.y-indexMCP.y)**2) < 0.18;
+  isFist=(curled>=3)&&thumbTucked;
+}
+
+// ══════════════════════════════════════
+//  图片加载
+// ══════════════════════════════════════
+function loadImages(){
+  const sources = (typeof IMGS_B64 !== 'undefined' ? IMGS_B64 : []);
+  if(!sources.length){ console.warn('IMGS_B64 empty'); return; }
+  imgs=new Array(sources.length);
+  loaded=0;
+  sources.forEach((src,i)=>{
+    const img=new Image();
+    img.onload=()=>{
+      loaded++;
+      console.log('img loaded:'+i+' size:'+img.naturalWidth+'x'+img.naturalHeight);
+      if(loaded===sources.length){ console.log('all images loaded, initing...'); init(); }
+    };
+    img.onerror=()=>{ console.error('img load FAIL:'+i); };
+    img.src=src;
+    imgs[i]=img;
+  });
+}
+
+
+// ══════════════════════════════════════
+//  像素运动检测（帧差法）
+// ══════════════════════════════════════
+function initMotionDetection(){
+  motionOffCanvas=document.createElement('canvas');
+  motionOffCanvas.width=80; motionOffCanvas.height=60;
+  motionOffCtx=motionOffCanvas.getContext('2d',{willReadFrequently:true});
+  lastMotionFrame=null; motionCheckTimer=0;
+}
+
+function checkMotion(){
+  const video=document.getElementById('cam');
+  if(!video||video.readyState<2) return;
+  const now=performance.now();
+  if(now-motionCheckTimer<MOTION_CHECK_MS) return;
+  motionCheckTimer=now;
+
+  motionOffCtx.drawImage(video,0,0,80,60);
+  const cur=motionOffCtx.getImageData(0,0,80,60).data;
+  if(!lastMotionFrame){ lastMotionFrame=cur; return; }
+
+  let diffPixels=0;
+  for(let i=0;i<cur.length;i+=4){
+    const dr=Math.abs(cur[i]-lastMotionFrame[i]);
+    const dg=Math.abs(cur[i+1]-lastMotionFrame[i+1]);
+    const db=Math.abs(cur[i+2]-lastMotionFrame[i+2]);
+    if(dr+dg+db>MOTION_DIFF) diffPixels++;
+  }
+  lastMotionFrame=cur;
+  const totalPixels=80*60;
+  const curMotion=diffPixels/totalPixels>MOTION_FRAC;
+  if(curMotion){
+    motionConsecutive++;
+    // 连续2次以上才真正触发（过滤偶发噪点）
+    if(motionConsecutive>=MOTION_CONSEC_THRESHOLD){
+      motionDetected=true;
+      lastMotionTime=now;
+    }
+  }else{
+    motionConsecutive=0;
+    if(now-lastMotionTime>MOTION_CLEAR_DELAY){
+      motionDetected=false;
+    }
+  }
+}
+
+// ══════════════════════════════════════
+//  初始化 & 构建碎片
+// ══════════════════════════════════════
+let blocks=[];
+
+function init(){
+  resize();
+  buildBlocks();
+  if(animId) cancelAnimationFrame(animId);
+  lastTime=0;
+  console.log('init done, blocks:'+blocks.length);
+  initCamera();
+  initMotionDetection();
+  animate();
+}
+
+function resize(){
+  W=canvas.width=window.innerWidth;
+  H=canvas.height=window.innerHeight;
+}
+
+function toggleFullscreen(){
+  if(!document.fullscreenElement){
+    document.documentElement.requestFullscreen().catch(()=>{});
+    document.getElementById('fs-btn').classList.add('exit');
+  }else{
+    document.exitFullscreen();
+    document.getElementById('fs-btn').classList.remove('exit');
+  }
+}
+
+function buildBlocks(){
+  const img=imgs[imgIndex];
+  if(!img||!img.naturalWidth){ console.warn('buildBlocks: no img'); return; }
+  try{
+    blocks=[];
+    const iw=img.naturalWidth, ih=img.naturalHeight;
+    const imgAspect=iw/ih;
+    let dw,dh,imgOx,imgOy;
+    if(W/H > imgAspect){
+      dh=H; dw=dh*imgAspect;
+    }else{
+      dw=W; dh=dw/imgAspect;
+    }
+    imgOx=(W-dw)/2; imgOy=(H-dh)/2;
+    const scX=iw/dw, scY=ih/dh;
+
+    // ── 大初始正方形 + 随机顽固值递归 ──
+    // 初始格子边长 = min(图片宽高)/4，最大碎片约占全图 1/16
+    // 每个格子有独立顽固值，高顽固值 = 保留为巨型，低顽固值 = 拆到极小
+    const baseSize = Math.max(MIN_CELL * 3,
+      Math.floor(Math.min(iw, ih) / 4));
+    const cols = Math.max(1, Math.ceil(iw / baseSize));
+    const rows = Math.max(1, Math.ceil(ih / baseSize));
+
+    const rawRects = [];
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const sx = col * baseSize;
+        const sy = row * baseSize;
+        const size = Math.min(baseSize, iw - sx, ih - sy);
+        if (size >= MIN_CELL) rawRects.push({sx, sy, size});
+      }
+    }
+
+    // Step 2: 每个正方形独立顽固值，递归四等分
+    const finalRects = [];
+    function splitSquare(sx, sy, size, stubborn) {
+      if (size < MIN_CELL * 2) {
+        finalRects.push({sx, sy, sw: size, sh: size}); return;
+      }
+      if (Math.random() < stubborn) {
+        finalRects.push({sx, sy, sw: size, sh: size}); return;
+      }
+      const half = Math.floor(size / 2);
+      // 子碎片继承部分顽固倾向但有随机偏移
+      splitSquare(sx, sy, half,
+        Math.min(1, Math.max(0, stubborn + (Math.random() - 0.5) * 0.4)));
+      splitSquare(sx + half, sy, size - half,
+        Math.min(1, Math.max(0, stubborn + (Math.random() - 0.5) * 0.4)));
+      splitSquare(sx, sy + half, half,
+        Math.min(1, Math.max(0, stubborn + (Math.random() - 0.5) * 0.4)));
+      splitSquare(sx + half, sy + half, size - half,
+        Math.min(1, Math.max(0, stubborn + (Math.random() - 0.5) * 0.4)));
+    }
+
+    for (const r of rawRects) splitSquare(r.sx, r.sy, r.size, Math.random());
+
+    // 扩大 OVERLAP 消除接缝
+    for (const r of finalRects) {
+      r.sx = Math.max(0, r.sx - OVERLAP);
+      r.sy = Math.max(0, r.sy - OVERLAP);
+      r.sw = Math.min(iw - r.sx, r.sw + OVERLAP * 2);
+      r.sh = Math.min(ih - r.sy, r.sh + OVERLAP * 2);
+    }
+
+    const maxScatter = Math.min(W,H)*0.30;
+    for(const r of finalRects){
+      const bw=r.sw/scX, bh=r.sh/scY;
+      const homeX=imgOx+r.sx/scX, homeY=imgOy+r.sy/scY;
+      const homeCX=homeX+bw*0.5, homeCY=homeY+bh*0.5;
+      const angle=Math.random()*Math.PI*2;
+      let dist=bw*(0.5+Math.random()*2.2);
+      const maxD=Math.min(homeCX-6,W-homeCX-6,homeCY-6,H-homeCY-6,maxScatter);
+      dist=Math.min(dist, Math.max(maxD,bw*0.3));
+      dist=Math.max(dist,bw*0.25);
+      blocks.push({
+        sx:r.sx,sy:r.sy,sw:r.sw,sh:r.sh,
+        w:Math.max(3, bw), h:Math.max(3, bh),
+        homeX,homeY,homeCX,homeCY,
+        scatterX:homeX+Math.cos(angle)*dist,
+        scatterY:homeY+Math.sin(angle)*dist,
+        x:homeX+Math.cos(angle)*dist,
+        y:homeY+Math.sin(angle)*dist,
+        displacing:false, glow:0
+      });
+    }
+    console.log('blocks:'+blocks.length+' maxSize:'+
+      Math.max(...blocks.map(b=>b.sw)).toFixed(0)+'px minSize:'+
+      Math.min(...blocks.map(b=>b.sw)).toFixed(0)+'px W:'+W+' H:'+H);
+  }catch(e){ console.error('buildBlocks error:',e); }
+}
+
+// ══════════════════════════════════════
+//  更新碎片位置
+//  摄像头模式：无/远人 → 全拼合；靠近 → 全散开；手掌局部拼合
+//  鼠标模式：移动鼠标拼合，离开散开
+// ══════════════════════════════════════
+function updateBlocks(ms){
+  const convF = 1 - Math.exp(-CONV_RATE * ms);
+  const scatF = 1 - Math.exp(-SCAT_RATE * ms);
+
+  let converged=0, scattered=0, moving=0;
+
+  // 当前交互输入
+  const ix = cameraActive ? handX : mouseX;
+  const iy = cameraActive ? handY : mouseY;
+  const inputActive = cameraActive ? handDetected : mouseOnCanvas;
+
+  for(let i=0;i<blocks.length;i++){
+    const b=blocks[i];
+    const prevX=b.x, prevY=b.y;
+
+    const dx=ix - b.homeCX;
+    const dy=iy - b.homeCY;
+    const dist=Math.sqrt(dx*dx + dy*dy);
+    const inside = inputActive && dist < MOUSE_RADIUS;
+
+    if(cameraActive){
+      // ── 摄像头模式（手部追踪 + 运动检测驱动）──
+      const nearEnough = handDetected || motionDetected;
+      if(!nearEnough){
+        // 没有手 → 全部拼合归位（完整画面）
+        b.x += (b.homeX - b.x) * convF;
+        b.y += (b.homeY - b.y) * convF;
+        if(Math.abs(b.x-b.homeX)<SNAP&&Math.abs(b.y-b.homeY)<SNAP){b.x=b.homeX;b.y=b.homeY;converged++;}
+      }else{
+        // 有人靠近 → 默认全散开
+        if(inside && !isFist){
+          // 手掌靠近该碎片 → 局部拼合
+          b.x += (b.homeX - b.x) * convF;
+          b.y += (b.homeY - b.y) * convF;
+          if(Math.abs(b.x-b.homeX)<SNAP&&Math.abs(b.y-b.homeY)<SNAP){b.x=b.homeX;b.y=b.homeY;converged++;}
+        }else{
+          // 手掌不在附近 或 握拳中 → 散开
+          b.x += (b.scatterX - b.x) * scatF;
+          b.y += (b.scatterY - b.y) * scatF;
+          if(Math.abs(b.x-b.scatterX)<SNAP&&Math.abs(b.y-b.scatterY)<SNAP){b.x=b.scatterX;b.y=b.scatterY;scattered++;}
+        }
+      }
+    }else{
+      // ── 鼠标模式（原始逻辑） ──
+      if(inside){
+        b.x += (b.homeX - b.x) * convF;
+        b.y += (b.homeY - b.y) * convF;
+        if(Math.abs(b.x-b.homeX)<SNAP&&Math.abs(b.y-b.homeY)<SNAP){b.x=b.homeX;b.y=b.homeY;converged++;}
+      }else{
+        b.x += (b.scatterX - b.x) * scatF;
+        b.y += (b.scatterY - b.y) * scatF;
+        if(Math.abs(b.x-b.scatterX)<SNAP&&Math.abs(b.y-b.scatterY)<SNAP){b.x=b.scatterX;b.y=b.scatterY;scattered++;}
+      }
+    }
+
+    b.displacing = Math.abs(b.x-prevX) > 0.02 || Math.abs(b.y-prevY) > 0.02;
+    if(b.displacing){
+      const speed=Math.sqrt((b.x-prevX)**2+(b.y-prevY)**2);
+      b.glow=Math.min(0.15, speed*0.6);
+      moving++;
+    }else{
+      b.glow=0;
+    }
+  }
+
+  // 调试面板
+  if(SHOW_DEBUG && blocks.length){
+    const s=blocks[Math.floor(blocks.length/2)|0];
+    const dx2=ix-s.homeCX, dy2=iy-s.homeCY;
+    const insideNow = inputActive && Math.sqrt(dx2*dx2+dy2*dy2) < MOUSE_RADIUS;
+    debugEl.style.display='block';
+    debugEl.innerHTML=
+      'camera:'+cameraActive+' near:'+personNear+' motion:'+motionDetected+' fist:'+isFist+'<br>'+
+      'hand:('+Math.round(handX)+','+Math.round(handY)+') size:'+handSize.toFixed(3)+'<br>'+
+      'sample.home:('+s.homeCX.toFixed(0)+','+s.homeCY.toFixed(0)+')<br>'+
+      'sample.xy:('+s.x.toFixed(1)+','+s.y.toFixed(1)+')<br>'+
+      'inside:'+insideNow+' ms:'+ms.toFixed(1)+' convF:'+convF.toFixed(4)+'<br>'+
+      'converged:'+converged+' scattered:'+scattered+' moving:'+moving+'<br>'+
+      'blocks:'+blocks.length;
+  }else{
+    debugEl.style.display='none';
+  }
+}
+
+// ══════════════════════════════════════
+//  渲染
+// ══════════════════════════════════════
+function render(){
+  const img=imgs[imgIndex];
+  if(!img||!blocks.length) return;
+  try{
+    ctx.fillStyle='#08080c';
+    ctx.fillRect(0,0,W,H);
+
+    // 背景升腾粒子（图片碎片后方）
+    renderBgParticles();
+
+    renderParticles();
+
+    for(let i=0;i<blocks.length;i++){
+      const b=blocks[i];
+      const rx = b.x, ry = b.y;
+      const rw=b.w, rh=b.h;
+
+      ctx.shadowColor='rgba(0,0,0,0.35)';
+      ctx.shadowBlur=1.2;
+      ctx.shadowOffsetX=0.3; ctx.shadowOffsetY=0.3;
+
+      ctx.globalAlpha=transitionAlpha;
+      ctx.drawImage(img,
+        Math.max(0,Math.min(img.naturalWidth-1,b.sx)),
+        Math.max(0,Math.min(img.naturalHeight-1,b.sy)),
+        Math.max(1,Math.min(b.sw, img.naturalWidth-b.sx)),
+        Math.max(1,Math.min(b.sh, img.naturalHeight-b.sy)),
+        Math.round(rx),Math.round(ry),rw,rh
+      );
+      ctx.shadowColor='transparent'; ctx.shadowBlur=0;
+      ctx.globalAlpha=1;
+
+      // 整体提亮：additive blending 叠加暖白光，位移中碎片呈现通透发光感
+      if(b.glow>0.005){
+        ctx.save();
+        ctx.globalCompositeOperation='lighter';
+        ctx.fillStyle='rgba(255,245,220,'+(b.glow*0.06)+')';
+        ctx.fillRect(rx,ry,rw,rh);
+        // 第二层：更聚焦的暖光
+        ctx.fillStyle='rgba(255,235,200,'+(b.glow*0.03)+')';
+        ctx.fillRect(rx,ry,rw,rh);
+        ctx.restore();
+      }
+
+      // 位移时飘散粒子
+      if(b.displacing && Math.random()<0.18){
+        spawnParticles(rx+rw/2, ry+rh/2);
+      }
+
+      // ── 调试可视化 ─────────────────────
+      if(SHOW_DEBUG){
+        // 归属位置（homeX,homeY）：品红色框（碎片归位后应画的位置）
+        ctx.strokeStyle='rgba(255,0,200,0.8)';
+        ctx.lineWidth=1.5;
+        ctx.strokeRect(b.homeX, b.homeY, b.w, b.h);
+
+        // 散开目标位置：黄色小点
+        ctx.fillStyle='rgba(255,220,0,0.7)';
+        ctx.fillRect(b.scatterX+b.w/2-2, b.scatterY+b.h/2-2, 4, 4);
+
+        // 归属中心：红点
+        ctx.fillStyle='rgba(255,60,60,0.9)';
+        ctx.fillRect(b.homeCX-3, b.homeCY-3, 6, 6);
+      }
+    }
+
+    // 调试：鼠标影响范围圆（红色虚线）
+    if(SHOW_DEBUG && mouseOnCanvas){
+      ctx.setLineDash([6,4]);
+      ctx.strokeStyle='rgba(255,90,90,0.55)';
+      ctx.lineWidth=1.5;
+      ctx.beginPath();
+      ctx.arc(mouseX,mouseY,MOUSE_RADIUS,0,Math.PI*2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // 自定义光标（摄像头模式：手掌位置 + 状态环）
+    if(cameraActive && handDetected){
+      // 握拳时显示红色切换提示环
+      if(isFist){
+        ctx.beginPath();
+        ctx.arc(handX,handY,34,0,Math.PI*2);
+        ctx.strokeStyle='rgba(255,140,140,0.55)';
+        ctx.lineWidth=2.5; ctx.setLineDash([8,4]); ctx.stroke(); ctx.setLineDash([]);
+        // 内圈
+        ctx.beginPath();
+        ctx.arc(handX,handY,14,0,Math.PI*2);
+        ctx.fillStyle='rgba(255,120,120,0.18)'; ctx.fill();
+        ctx.strokeStyle='rgba(255,160,160,0.4)';
+        ctx.lineWidth=1.5; ctx.stroke();
+      }else if(!personNear){
+        // 距离远 → 绿点表示画面完整
+        ctx.beginPath();
+        ctx.arc(handX,handY,6,0,Math.PI*2);
+        ctx.fillStyle='rgba(140,220,160,0.45)'; ctx.fill();
+        ctx.beginPath();
+        ctx.arc(handX,handY,18,0,Math.PI*2);
+        ctx.strokeStyle='rgba(140,220,160,0.2)';
+        ctx.lineWidth=1; ctx.setLineDash([4,6]); ctx.stroke(); ctx.setLineDash([]);
+      }
+      // 手掌光标（始终显示）
+      const grd=ctx.createRadialGradient(handX,handY,0,handX,handY,30);
+      grd.addColorStop(0,'rgba(200,195,240,0.18)');
+      grd.addColorStop(0.6,'rgba(160,155,210,0.06)');
+      grd.addColorStop(1,'rgba(120,110,160,0)');
+      ctx.fillStyle=grd;
+      ctx.beginPath(); ctx.arc(handX,handY,30,0,Math.PI*2); ctx.fill();
+      ctx.beginPath();
+      ctx.arc(handX,handY,3,0,Math.PI*2);
+      ctx.fillStyle='rgba(210,200,235,0.5)'; ctx.fill();
+    }else if(mouseOnCanvas){
+      const grd=ctx.createRadialGradient(mouseX,mouseY,0,mouseX,mouseY,26);
+      grd.addColorStop(0,'rgba(195,182,160,0.25)');
+      grd.addColorStop(0.5,'rgba(160,150,135,0.09)');
+      grd.addColorStop(1,'rgba(120,110,100,0)');
+      ctx.fillStyle=grd;
+      ctx.beginPath(); ctx.arc(mouseX,mouseY,26,0,Math.PI*2); ctx.fill();
+      ctx.beginPath();
+      ctx.arc(mouseX,mouseY,2.5,0,Math.PI*2);
+      ctx.fillStyle='rgba(200,188,165,0.55)';
+      ctx.fill();
+    }
+
+  }catch(e){ console.error('render error:',e); }
+}
+
+// ══════════════════════════════════════
+//  动画循环
+// ══════════════════════════════════════
+let lastTime=0;
+function animate(time){
+  animId=requestAnimationFrame(animate);
+  const t = time || performance.now();
+  // ms_elapsed：上一帧到这一帧的真实毫秒数，限制在 1~50ms 之间
+  const ms = lastTime ? Math.min(Math.max(t - lastTime, 1), 50) : 16;
+  lastTime = t;
+
+  // 背景粒子生成（稀疏节奏）
+  bgSpawnTimer+=ms;
+  while(bgSpawnTimer>350&&bgParticles.length<BG_MAX){
+    spawnBgParticle();
+    bgSpawnTimer-=350;
+  }
+  if(bgParticles.length<3){
+    spawnBgParticle();
+  }
+
+  updateBgParticles(ms);
+  if(cameraActive) checkMotion();
+  updateBlocks(ms);
+  updateParticles();
+
+  // 握拳切换画面（上升沿 + 冷却）
+  if(cameraActive){
+    if(isFist && !fistJustDetected && fistCooldown<=0){
+      fistJustDetected=true;
+      imgIndex=(imgIndex+1)%imgs.length;
+      counterEl.textContent=String(imgIndex+1).padStart(2,'0')+' / '+String(imgs.length).padStart(2,'0');
+      transitionAlpha=0; transitionTarget=1; transitionStart=performance.now();
+      buildBlocks();
+      fistCooldown=FIST_COOLDOWN_FRAMES;
+    }
+    if(!isFist) fistJustDetected=false;
+    if(fistCooldown>0) fistCooldown--;
+  }
+
+  if(transitionAlpha<transitionTarget){
+    const elapsed=performance.now()-transitionStart;
+    transitionAlpha=Math.min(1, elapsed/TRANSITION_MS);
+  }
+  render();
+}
+
+// ══════════════════════════════════════
+//  事件
+// ══════════════════════════════════════
+canvas.addEventListener('mousemove',e=>{
+  mouseX=e.clientX; mouseY=e.clientY; mouseOnCanvas=true;
+  hintEl.style.opacity='0';
+});
+canvas.addEventListener('mouseleave',()=>{ mouseOnCanvas=false; });
+canvas.addEventListener('mouseenter',()=>{ mouseOnCanvas=true; });
+
+canvas.addEventListener('click',()=>{
+  imgIndex=(imgIndex+1)%imgs.length;
+  counterEl.textContent=String(imgIndex+1).padStart(2,'0')+' / '+String(imgs.length).padStart(2,'0');
+  transitionAlpha=0; transitionTarget=1; transitionStart=performance.now();
+  buildBlocks();
+});
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||e.key==='ArrowDown'){
+    imgIndex=(imgIndex+1)%imgs.length;
+    counterEl.textContent=String(imgIndex+1).padStart(2,'0')+' / '+String(imgs.length).padStart(2,'0');
+    transitionAlpha=0; transitionTarget=1; transitionStart=performance.now();
+    buildBlocks();
+  }else if(e.key==='ArrowLeft'||e.key==='ArrowUp'){
+    imgIndex=(imgIndex-1+imgs.length)%imgs.length;
+    counterEl.textContent=String(imgIndex+1).padStart(2,'0')+' / '+String(imgs.length).padStart(2,'0');
+    transitionAlpha=0; transitionTarget=1; transitionStart=performance.now();
+    buildBlocks();
+  }else if(e.key.toLowerCase()==='d'){
+    SHOW_DEBUG=!SHOW_DEBUG;
+    console.log('debug:'+SHOW_DEBUG);
+  }
+});
+
+window.addEventListener('resize',()=>{ resize(); buildBlocks(); });
+document.getElementById('fs-btn').addEventListener('click',toggleFullscreen);
+document.addEventListener('fullscreenchange',()=>{
+  const btn=document.getElementById('fs-btn');
+  if(!document.fullscreenElement) btn.classList.remove('exit');
+  resize(); buildBlocks();
+});
+
+// ══════════════════════════════════════
+//  启动（先加载字体，再启动）
+// ══════════════════════════════════════
+Promise.all([
+  document.fonts.load('40px "FangSong"'),
+  document.fonts.load('40px "STXingkai"')
+]).then(()=>{ console.log('fonts ready'); loadImages(); })
+  .catch(()=>{ console.log('font load failed, fallback'); loadImages(); });
+
+</script>
+</body>
+</html>
